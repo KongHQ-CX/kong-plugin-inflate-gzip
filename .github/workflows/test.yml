@@ -8,10 +8,7 @@ on:
   pull_request: {}
   push:
     branches:
-    - master
-  schedule:
-  # every day at midnight, to test against non-pinned versions in the matrix
-  - cron: '0 0 * * *'
+    - main
 
 jobs:
   test:
@@ -21,23 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         kongVersion:
-        - "3.4.x"
-        - "stable"
-        - "dev"
-        - "2.8.x.x"
-        - "3.4.x.x"
-        - "stable-ee"
-        - "dev-ee"
+        - "3.6.1.4"
 
     steps:
     - uses: actions/checkout@v3
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      # login to docker to prevent hitting rate-limits etc
-      with:
-        username: ${{ secrets.GHA_DOCKERHUB_PULL_USER }}
-        password: ${{ secrets.GHA_KONG_ORG_DOCKERHUB_PUBLIC_TOKEN }}
 
     - uses: Kong/kong-license@master
       # this step is only for Kong Inc internal uses, external users should
@@ -47,7 +31,7 @@ jobs:
 
     - uses: Kong/kong-pongo-action@v1
       with:
-        pongo_version: master
+        pongo_version: "2.10.0"
         kong_version: ${{ matrix.kongVersion }}
 
         # Non-Kong-Inc users should provide their Enterprise license as a secret
@@ -62,33 +46,3 @@ jobs:
         github_token: ${{ secrets.GHA_KONG_BOT_READ_TOKEN }}
 
     - run: pongo run -- --Xoutput "--color" --coverage
-
-
-
-
-    # Optional upload of coverage data,
-    # just ugly, something to fix...
-    - uses: leafo/gh-actions-lua@v10
-      if: success()
-    - uses: leafo/gh-actions-luarocks@v4
-      if: success()
-    - name: Report test coverage
-      if: success()
-      continue-on-error: true
-      run: |
-        luarocks install luacov-coveralls
-        # hack: luacov config file has a path for inside the pongo container
-        # rewrite those to the local location in GHA
-        if [ -f .luacov ]; then
-          cp .luacov .luacov_backup
-          cat .luacov_backup | sed 's/\/kong-plugin\/luacov./luacov./' > .luacov
-        fi
-        rm *.report.out
-        luacov-coveralls
-        #luacov-coveralls --output coveralls.out
-        # undo the hack
-        if [ -f .luacov_backup ]; then
-          mv .luacov_backup .luacov
-        fi
-      env:
-        COVERALLS_REPO_TOKEN: ${{ github.token }}
