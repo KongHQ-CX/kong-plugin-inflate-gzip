@@ -12,9 +12,9 @@ local schema = {
     { config = {
         type = "record",
         fields = {
-          { deflate_response = typedefs.header_name {
+          { deflate_response = {
+              type = "boolean",
               required = true,
-              description = "If set true, will also deflate (compress) the response from the backend",
               default = false } },
         },
       },

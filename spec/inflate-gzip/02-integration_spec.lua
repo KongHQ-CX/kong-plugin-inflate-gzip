@@ -1,10 +1,11 @@
 local helpers = require "spec.helpers"
+local cjson = require "cjson"
 
 
 local PLUGIN_NAME = "inflate-gzip"
 
 
-for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" and strategy == "off" then
+for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" then
   describe(PLUGIN_NAME .. ": (access) [#" .. strategy .. "]", function()
     local client
 
@@ -12,16 +13,28 @@ for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" and st
 
       local bp = helpers.get_db_utils(strategy == "off" and "postgres" or strategy, nil, { PLUGIN_NAME })
 
-      -- Inject a test route. No need to create a service, there is a default
-      -- service which will echo the request.
+      -- this route-set DOES NOT deflate the response body
       local route1 = bp.routes:insert({
         hosts = { "test1.com" },
       })
-      -- add the plugin to test to the route we created
       bp.plugins:insert {
         name = PLUGIN_NAME,
         route = { id = route1.id },
-        config = {},
+        config = {
+          deflate_response = false,
+        },
+      }
+
+      -- this route-set DOES deflate the response body
+      local route2 = bp.routes:insert({
+        hosts = { "test2.com" },
+      })
+      bp.plugins:insert {
+        name = PLUGIN_NAME,
+        route = { id = route2.id },
+        config = {
+          deflate_response = true,
+        },
       }
 
       -- start kong
@@ -50,39 +63,58 @@ for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" and st
     end)
 
 
-
     describe("request", function()
-      -- it("gets a 'hello-world' header", function()
-      --   local r = client:get("/request", {
-      --     headers = {
-      --       host = "test1.com"
-      --     }
-      --   })
-      --   -- validate that the request succeeded, response status 200
-      --   assert.response(r).has.status(200)
-      --   -- now check the request (as echoed by the mock backend) to have the header
-      --   local header_value = assert.request(r).has.header("hello-world")
-      --   -- validate the value of that header
-      --   assert.equal("this is on a request", header_value)
-      -- end)
+      it("inflates gzip during the plugin execution", function()
+        local utils
+        local is_36, utils = pcall(require, "kong.tools.gzip")
+        if not is_36 then
+          utils = require("kong.tools.utils")
+        end
+
+        local body = utils.deflate_gzip("Hello World")
+        
+        local r = client:get("/request", {
+          headers = {
+            host = "test1.com",
+            ["Content-Encoding"] = "gzip",
+          },
+          body = body,
+        })
+
+        -- validate that the request succeeded, response status 200
+        local response_body = assert.response(r).has.status(200)
+        response_body = cjson.decode(response_body)
+
+        assert.same(response_body.post_data.text, "Hello World")
+        assert.response(r).not_has.header("Content-Encoding")
+      end)
     end)
 
 
-
     describe("response", function()
-      -- it("gets a 'bye-world' header", function()
-      --   local r = client:get("/request", {
-      --     headers = {
-      --       host = "test1.com"
-      --     }
-      --   })
-      --   -- validate that the request succeeded, response status 200
-      --   assert.response(r).has.status(200)
-      --   -- now check the response to have the header
-      --   local header_value = assert.response(r).has.header("bye-world")
-      --   -- validate the value of that header
-      --   assert.equal("this is on the response", header_value)
-      -- end)
+      it("re-deflates the response to gzip if enabled", function()
+        local utils
+        local is_36, utils = pcall(require, "kong.tools.gzip")
+        if not is_36 then
+          utils = require("kong.tools.utils")
+        end
+
+        local body = utils.deflate_gzip("Hello World")
+        
+        local r = client:get("/request", {
+          headers = {
+            host = "test2.com",
+            ["Content-Encoding"] = "gzip",
+          },
+          body = body,
+        })
+
+        -- validate that the request succeeded, response status 200
+        local response_body = assert.response(r).has.status(200)
+        response_body = cjson.decode(utils.inflate_gzip(response_body))
+
+        assert.same(response_body.post_data.text, "Hello World")
+      end)
     end)
 
   end)
