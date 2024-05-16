@@ -18,7 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         kongVersion:
-        - "3.6.1.4"
+        - "3.3.0.0"
+        - "3.6.0.0"
 
     steps:
     - uses: actions/checkout@v3
