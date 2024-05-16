@@ -26,7 +26,7 @@ jobs:
 
     - uses: Kong/kong-pongo-action@v1
       with:
-        pongo_version: "2.10.0"
+        pongo_version: "master"
         kong_version: ${{ matrix.kongVersion }}
 
     - run: pongo run -- --Xoutput "--color" --coverage
