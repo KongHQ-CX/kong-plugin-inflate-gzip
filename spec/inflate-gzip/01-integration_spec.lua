@@ -65,7 +65,6 @@ for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" then
 
     describe("request", function()
       it("inflates gzip during the plugin execution", function()
-        local utils
         local is_36, utils = pcall(require, "kong.tools.gzip")
         if not is_36 then
           utils = require("kong.tools.utils")
@@ -93,7 +92,6 @@ for _, strategy in helpers.all_strategies() do if strategy ~= "cassandra" then
 
     describe("response", function()
       it("re-deflates the response to gzip if enabled", function()
-        local utils
         local is_36, utils = pcall(require, "kong.tools.gzip")
         if not is_36 then
           utils = require("kong.tools.utils")
