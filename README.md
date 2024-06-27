@@ -1,4 +1,4 @@
-# Kong Plugin - Inflate GZIP
+# Kong Plugin - Inflate GZIP
 
 Transparently inflates/deflates GZIP HTTP body(s), when a client is using it but the backend only accepts plaintext payloads.
 
